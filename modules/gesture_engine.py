@@ -24,3 +24,18 @@ class GestureEngine:
         if fingers == [0, 1, 1, 0, 0]: return "Peace"
         return "Unknown"
 
+    def get_drawing_mode(self, fingers):
+        if fingers == [0, 1, 0, 0, 0]:
+            return "DRAWING"
+        elif fingers == [0, 1, 1, 0, 0]:
+            return "SELECTION"
+        return "IDLE"
+
+    def get_system_gesture(self, landmarks):
+        if landmarks[4].y < landmarks[3].y and landmarks[4].y < landmarks[
+            8].y:
+            return "THUMBS_UP"
+        elif landmarks[4].y > landmarks[3].y and landmarks[4].y > \
+                landmarks[8].y:
+            return "THUMBS_DOWN"
+        return None

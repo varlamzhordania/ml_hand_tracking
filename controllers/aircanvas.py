@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 
 
 class AirCanvas:
@@ -18,23 +19,27 @@ class AirCanvas:
         cy = int(landmarks[8].y * h)
 
         if mode == "DRAWING":
+            # If this is the start of a new line
             if self.prev_x == 0 and self.prev_y == 0:
                 self.prev_x, self.prev_y = cx, cy
 
-            cv2.line(
-                self.canvas,
-                (self.prev_x, self.prev_y),
-                (cx, cy),
-                self.color,
-                self.thickness
-            )
+            movement_dist = math.hypot(cx - self.prev_x, cy - self.prev_y)
+
+            if movement_dist < 100:
+                cv2.line(
+                    self.canvas,
+                    (self.prev_x, self.prev_y),
+                    (cx, cy),
+                    self.color,
+                    self.thickness
+                    )
+
+            self.prev_x, self.prev_y = cx, cy
             cv2.circle(frame, (cx, cy), 10, self.color, cv2.FILLED)
 
-        elif mode == "SELECTION":
-            cv2.circle(frame, (cx, cy), 15, (255, 255, 255), 2)
+        else:
             self.prev_x, self.prev_y = 0, 0
-
-        self.prev_x, self.prev_y = cx, cy
+            cv2.circle(frame, (cx, cy), 15, (255, 255, 255), 2)
 
         frame_gray = cv2.cvtColor(self.canvas, cv2.COLOR_BGR2GRAY)
         _, inv_mask = cv2.threshold(
@@ -42,9 +47,9 @@ class AirCanvas:
             50,
             255,
             cv2.THRESH_BINARY_INV
-        )
+            )
         inv_mask = cv2.cvtColor(inv_mask, cv2.COLOR_GRAY2BGR)
-
-        img_combined = cv2.bitwise_and(frame, inv_mask)
-        img_combined = cv2.bitwise_or(img_combined, self.canvas)
-        return img_combined
+        return cv2.bitwise_or(
+            cv2.bitwise_and(frame, inv_mask),
+            self.canvas
+            )

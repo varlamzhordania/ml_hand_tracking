@@ -19,7 +19,6 @@ class AirCanvas:
         cy = int(landmarks[8].y * h)
 
         if mode == "DRAWING":
-            # If this is the start of a new line
             if self.prev_x == 0 and self.prev_y == 0:
                 self.prev_x, self.prev_y = cx, cy
 

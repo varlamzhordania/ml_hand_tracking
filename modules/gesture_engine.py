@@ -39,3 +39,4 @@ class GestureEngine:
                 landmarks[8].y:
             return "THUMBS_DOWN"
         return None
+

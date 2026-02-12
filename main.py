@@ -7,8 +7,9 @@ import math
 from PIL import Image
 
 from controllers.aircanvas import AirCanvas
-from modules.hand_detector import HandDetector
+from modules.hand_detector import HandDetector, LandmarkSmoother
 from modules.gesture_engine import GestureEngine
+from utils import preprocess_frame
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -36,21 +37,21 @@ class VisionApp(ctk.CTk):
             self.sidebar,
             text="Air Canvas",
             command=lambda: self.set_mode("CANVAS")
-            )
+        )
         self.btn_canvas.pack(pady=10, padx=20)
 
         self.btn_counter = ctk.CTkButton(
             self.sidebar,
             text="Finger Counter",
             command=lambda: self.set_mode("COUNTER")
-            )
+        )
         self.btn_counter.pack(pady=10, padx=20)
 
         self.btn_system = ctk.CTkButton(
             self.sidebar,
             text="System Tools",
             command=lambda: self.set_mode("SYSTEM")
-            )
+        )
         self.btn_system.pack(pady=10, padx=20)
 
         self.btn_clear = ctk.CTkButton(
@@ -59,13 +60,38 @@ class VisionApp(ctk.CTk):
             fg_color="red",
             hover_color="#8B0000",
             command=self.clear_canvas
-            )
+        )
         self.btn_clear.pack(side="bottom", pady=20, padx=20)
 
         # --- Main Video Display ---
         self.video_label = ctk.CTkLabel(self, text="")
         self.video_label.pack(expand=True, fill="both", padx=20, pady=20)
 
+        # --- Enhancement Toggles ---
+        self.label_enhancements = ctk.CTkLabel(
+            self.sidebar,
+            text="Enhancements",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        self.label_enhancements.pack(pady=(20, 10))
+
+        self.smooth_var = ctk.BooleanVar(value=True)
+        self.switch_smooth = ctk.CTkSwitch(
+            self.sidebar,
+            text="Landmark Smoothing",
+            variable=self.smooth_var
+        )
+        self.switch_smooth.pack(pady=5, padx=20)
+
+        self.preprocess_var = ctk.BooleanVar(value=False)
+        self.switch_preprocess = ctk.CTkSwitch(
+            self.sidebar,
+            text="Auto-Brightness",
+            variable=self.preprocess_var
+        )
+        self.switch_preprocess.pack(pady=5, padx=20)
+
+        self.smoother = LandmarkSmoother(alpha=0.3)
         self.cap = cv2.VideoCapture(0)
         self.detector = HandDetector()
         self.engine = GestureEngine()
@@ -90,24 +116,37 @@ class VisionApp(ctk.CTk):
         success, frame = self.cap.read()
         if success:
             frame = cv2.flip(frame, 1)
+
+            if self.preprocess_var.get():
+                frame = preprocess_frame(frame)
+
             h, w, _ = frame.shape
 
             img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(
                 image_format=mp.ImageFormat.SRGB,
                 data=img_rgb
-                )
+            )
             timestamp = int(time.time() * 1000)
             result = self.detector.find_hands(mp_image, timestamp)
 
             if result.hand_landmarks:
                 landmarks = result.hand_landmarks[0]
-                finger_state = self.engine.get_fingers_up(landmarks)
 
+                if self.smooth_var.get():
+                    for i in range(len(landmarks)):
+                        landmarks[i].x, landmarks[
+                            i].y = self.smoother.smooth(
+                            i,
+                            landmarks[i].x,
+                            landmarks[i].y
+                        )
+
+                finger_state = self.engine.get_fingers_up(landmarks)
                 dist = math.hypot(
                     landmarks[8].x - landmarks[4].x,
                     landmarks[8].y - landmarks[4].y
-                    )
+                )
 
                 if dist < 0.04 and (
                         time.time() - self.pinch_cooldown > 0.8):
@@ -129,7 +168,7 @@ class VisionApp(ctk.CTk):
                         20,
                         (0, 255, 0),
                         cv2.FILLED
-                        )
+                    )
                 if self.current_mode == "CANVAS":
                     mode = self.engine.get_drawing_mode(finger_state)
                     frame = self.canvas_app.draw(frame, mode, landmarks)
@@ -139,7 +178,7 @@ class VisionApp(ctk.CTk):
                     cv2.putText(
                         frame, f"Fingers: {count}", (50, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4
-                        )
+                    )
 
                 elif self.current_mode == "SYSTEM":
                     gesture = self.engine.get_system_gesture(landmarks)
@@ -155,7 +194,7 @@ class VisionApp(ctk.CTk):
                     cv2.putText(
                         frame, f"System Active: {gesture}", (50, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 165, 0), 2
-                        )
+                    )
 
                 cursor_x = int(landmarks[8].x * w)
                 cursor_y = int(landmarks[8].y * h)
@@ -165,7 +204,7 @@ class VisionApp(ctk.CTk):
                     8,
                     (255, 255, 255),
                     -1
-                    )
+                )
 
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(img)
@@ -173,7 +212,7 @@ class VisionApp(ctk.CTk):
                 light_image=img,
                 dark_image=img,
                 size=(800, 500)
-                )
+            )
 
             self.video_label.configure(image=img_tk)
             self.video_label.image = img_tk

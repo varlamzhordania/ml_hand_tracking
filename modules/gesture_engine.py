@@ -1,19 +1,39 @@
+import math
+
+
 class GestureEngine:
     @staticmethod
-    def get_fingers_up(landmarks):
-        """Returns a list of 5 integers (1 for up, 0 for down)"""
+    def get_distance(p1, p2):
+        """Calculates the Euclidean distance between two landmarks."""
+        return math.hypot(p1.x - p2.x, p1.y - p2.y)
+
+    def get_fingers_up(self, landmarks):
+        """
+        Returns a list of 5 integers (1 for up, 0 for down) using
+        """
         fingers = []
-        if landmarks[4].x > landmarks[3].x:
+
+        thumb_dist = self.get_distance(landmarks[4], landmarks[17])
+        thumb_threshold = self.get_distance(landmarks[2], landmarks[17])
+
+        if thumb_dist > thumb_threshold:
             fingers.append(1)
         else:
             fingers.append(0)
 
         tips = [8, 12, 16, 20]
-        for tip in tips:
-            if landmarks[tip].y < landmarks[tip - 2].y:
+        knuckles = [5, 9, 13, 17]
+        wrist = landmarks[0]
+
+        for tip, knuckle in zip(tips, knuckles):
+            dist_tip = self.get_distance(landmarks[tip], wrist)
+            dist_knuckle = self.get_distance(landmarks[knuckle], wrist)
+
+            if dist_tip > dist_knuckle:
                 fingers.append(1)
             else:
                 fingers.append(0)
+
         return fingers
 
     def identify(self, fingers):
@@ -32,11 +52,11 @@ class GestureEngine:
         return "IDLE"
 
     def get_system_gesture(self, landmarks):
-        if landmarks[4].y < landmarks[3].y and landmarks[4].y < landmarks[
-            8].y:
+        thumb_tip = landmarks[4]
+        index_knuckle = landmarks[5]
+
+        if thumb_tip.y < index_knuckle.y - 0.05:
             return "THUMBS_UP"
-        elif landmarks[4].y > landmarks[3].y and landmarks[4].y > \
-                landmarks[8].y:
+        elif thumb_tip.y > index_knuckle.y + 0.05:
             return "THUMBS_DOWN"
         return None
-
